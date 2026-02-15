@@ -26,7 +26,7 @@ typedef enum {
     SEMICOLON,  // ;
     LPAREN,     // (
     RPAREN,     // )
-    EOF         // end of input file
+    END         // end of input file
 } TokenType;
 
 // token structure
@@ -67,9 +67,8 @@ void error(const char *message) {
 
 // symbol table functions
 
-// Search variables by name in the symbol table.
+// Linear Search variables by name in the symbol table.
 // Returns the index if found, -1 if not found.
-// linear search
 int lookupSymbol(const char *name) {
     int i;
     for (i = 0; i < symbolCount; i++) {
@@ -117,11 +116,11 @@ void tokenize(const char *source) {
 
             // Check if keyword or identifier
             if (strcmp(word, "int") == 0) {
-                tokens[tokenCount].type = TOKEN_INT;
+                tokens[tokenCount].type = INT;
             } else if (strcmp(word, "print") == 0) {
-                tokens[tokenCount].type = TOKEN_PRINT;
+                tokens[tokenCount].type = PRINT;
             } else {
-                tokens[tokenCount].type = TOKEN_ID;
+                tokens[tokenCount].type = ID;
             }
             strcpy(tokens[tokenCount].value, word);
             tokenCount++;
@@ -138,7 +137,7 @@ void tokenize(const char *source) {
             }
             number[numLen] = '\0';
 
-            tokens[tokenCount].type = TOKEN_NUMBER;
+            tokens[tokenCount].type = NUMBER;
             strcpy(tokens[tokenCount].value, number);
             tokenCount++;
             continue;
@@ -147,27 +146,27 @@ void tokenize(const char *source) {
         // handle special characters
         switch (source[i]) {
             case '=':
-                tokens[tokenCount].type = TOKEN_ASSIGN;
+                tokens[tokenCount].type = ASSIGN;
                 strcpy(tokens[tokenCount].value, "=");
                 tokenCount++;
                 break;
             case '+':
-                tokens[tokenCount].type = TOKEN_PLUS;
+                tokens[tokenCount].type = PLUS;
                 strcpy(tokens[tokenCount].value, "+");
                 tokenCount++;
                 break;
             case ';':
-                tokens[tokenCount].type = TOKEN_SEMICOLON;
+                tokens[tokenCount].type = SEMICOLON;
                 strcpy(tokens[tokenCount].value, ";");
                 tokenCount++;
                 break;
             case '(':
-                tokens[tokenCount].type = TOKEN_LPAREN;
+                tokens[tokenCount].type = LPAREN;
                 strcpy(tokens[tokenCount].value, "(");
                 tokenCount++;
                 break;
             case ')':
-                tokens[tokenCount].type = TOKEN_RPAREN;
+                tokens[tokenCount].type = RPAREN;
                 strcpy(tokens[tokenCount].value, ")");
                 tokenCount++;
                 break;
@@ -179,8 +178,8 @@ void tokenize(const char *source) {
     }
 
     // Add EOF token to mark the end of input
-    tokens[tokenCount].type = TOKEN_EOF;
-    strcpy(tokens[tokenCount].value, "EOF");
+    tokens[tokenCount].type = END;
+    strcpy(tokens[tokenCount].value, "END");
     tokenCount++;
 }
 
@@ -212,22 +211,22 @@ Token expect(TokenType type, const char *errorMsg) {
 // PARSER FUNCTIONS
 
 // pre declarations because functions call each other
-int parseExpression(void);
-int parseTerm(void);
+int Expression(void);
+int Term(void);
 
 // Parses a single term in an expression.
 // CFG Rule: Term > NUMBER | ID | '(' Expression ')'
-int parseTerm(void) {
+int Term(void) {
     Token t = peek();
 
     // Case 1: number > convert to integer and return
-    if (t.type == TOKEN_NUMBER) {
+    if (t.type == NUMBER) {
         advance();
         return atoi(t.value);
     }
 
     // Case 2: identifier > check if its value in symbol table
-    if (t.type == TOKEN_ID) {
+    if (t.type == ID) {
         advance();
         int index = lookupSymbol(t.value);
         if (index == -1) {
@@ -240,10 +239,10 @@ int parseTerm(void) {
     }
 
     // Case 3: parenthesized expression
-    if (t.type == TOKEN_LPAREN) {
+    if (t.type == LPAREN) {
         advance();  // consume '(' 
-        int result = parseExpression();
-        expect(TOKEN_RPAREN, "Syntax error: Expected ')' after expression");
+        int result = Expression();
+        expect(RPAREN, "Syntax error: Expected ')' after expression");
         return result;
     }
 
@@ -254,13 +253,13 @@ int parseTerm(void) {
 
 //Parses an expression with addition.
 // CFG Rule: Expression > Term ('+' Term)*
-int parseExpression(void) {
-    int result = parseTerm();  // parse the first term
+int Expression(void) {
+    int result = Term();  // parse the first term
 
     // do additon
-    while (peek().type == TOKEN_PLUS) {
+    while (peek().type == PLUS) {
         advance();  // consume '+'
-        int right = parseTerm();
+        int right = Term();
         result = result + right;
     }
 
@@ -269,9 +268,9 @@ int parseExpression(void) {
 
 // Parses a variable declaration.
 // CFG Rule: Declaration > 'int' ID '=' Expression ';'
-void parseDeclaration(void) {
+void Declaration(void) {
     // Get the variable name
-    Token nameToken = expect(TOKEN_ID, "Syntax error: Expected variable name after 'int'");
+    Token nameToken = expect(ID, "Syntax error: Expected variable name after 'int'");
 
     // Check if variable already exists
     if (lookupSymbol(nameToken.value) != -1) {
@@ -281,13 +280,13 @@ void parseDeclaration(void) {
     }
 
     // Expect '=' sign
-    expect(TOKEN_ASSIGN, "Syntax error: Expected '=' after variable name");
+    expect(ASSIGN, "Syntax error: Expected '=' after variable name");
 
     // Evaluate the expression on the right side
-    int value = parseExpression();
+    int value = Expression();
 
     // Expect semicolon at the end
-    expect(TOKEN_SEMICOLON, "Syntax error: Expected ';' at end of declaration");
+    expect(SEMICOLON, "Syntax error: Expected ';' at end of declaration");
 
     // Store the variable and its value in the symbol table
     addSymbol(nameToken.value, value);
@@ -297,29 +296,29 @@ void parseDeclaration(void) {
 // CFG Rule: PrintStmt > 'print' '(' Expression ')' ';'
 void parsePrint(void) {
     // Expect opening parenthesis
-    expect(TOKEN_LPAREN, "Syntax error: Expected '(' after 'print'");
+    expect(LPAREN, "Syntax error: Expected '(' after 'print'");
 
     // Evaluate the expression inside the parentheses
-    int value = parseExpression();
+    int value = Expression();
 
     // Expect closing parenthesis
-    expect(TOKEN_RPAREN, "Syntax error: Expected ')' after expression in print");
+    expect(RPAREN, "Syntax error: Expected ')' after expression in print");
 
     // Expect semicolon
-    expect(TOKEN_SEMICOLON, "Syntax error: Expected ';' after print statement");
+    expect(SEMICOLON, "Syntax error: Expected ';' after print statement");
 
     printf("%d\n", value);
 }
 
 // Parses a single statement.
 // CFG Rule: Statement > Declaration | PrintStmt
-void parseStatement(void) {
+void Statement(void) {
     Token t = peek();
 
-    if (t.type == TOKEN_INT) {
+    if (t.type == INT) {
         advance();  
-        parseDeclaration();
-    } else if (t.type == TOKEN_PRINT) {
+        Declaration();
+    } else if (t.type == PRINT) {
         advance();  
         parsePrint();
     } else {
@@ -330,8 +329,8 @@ void parseStatement(void) {
 // parses the entire program.
 // CFG Rule: Program > Statement*
 void parseProgram(void) {
-    while (peek().type != TOKEN_EOF) {
-        parseStatement();
+    while (peek().type != END) {
+        Statement();
     }
 }
 
